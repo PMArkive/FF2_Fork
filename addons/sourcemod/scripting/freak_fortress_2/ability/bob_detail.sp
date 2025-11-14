@@ -661,6 +661,7 @@ public void OnProjectileSpawn(int entity)
         angVector[2] *= 1500.0;
 
         int sentry = TF2_BuildSentry(client, origin, angles, 2);
+		// int sentry = TF2_BuildTeleporter(client, origin, angles);
         // SetEntityMoveType(sentry, MOVETYPE_VPHYSICS);
         SetEntityMoveType(sentry, MOVETYPE_FLYGRAVITY);
 
@@ -875,7 +876,7 @@ stock float fmodf(float num, float denom)
 	return num - denom * RoundToFloor(num / denom);
 }
 
-stock int TF2_BuildSentry(int builder, float fOrigin[3], float fAngle[3], int level, bool mini=false, bool disposable=false, bool carried=false, int flags=4)
+stock int TF2_BuildSentry(int builder, float fOrigin[3], float fAngle[3], int level, bool mini=false, bool disposable=false, int flags=4)
 {
     static const float m_vecMinsMini[3] = {-15.0, -15.0, 0.0};
     float m_vecMaxsMini[3] = {15.0, 15.0, 49.5};
@@ -940,6 +941,35 @@ stock int TF2_BuildSentry(int builder, float fOrigin[3], float fAngle[3], int le
             DispatchSpawn(sentry);
         }
 
+        // SetEntProp(sentry, Prop_Send, "m_bPlayerControlled", 1);
+        SetEntProp(sentry, Prop_Send, "m_iTeamNum", builder > 0 ? GetClientTeam(builder) : view_as<int>(FF2_GetBossTeam()));
+
+        return sentry;
+    }
+
+    return -1;
+}
+
+stock int TF2_BuildTeleporter(int builder, float fOrigin[3], float fAngle[3], int flags=4)
+{
+    int sentry = CreateEntityByName("obj_teleporter");
+
+    if(IsValidEntity(sentry))
+    {
+        AcceptEntityInput(sentry, "SetBuilder", builder);
+        SetEntPropEnt(sentry, Prop_Send, "m_hBuilder", builder);
+
+        DispatchKeyValueVector(sentry, "origin", fOrigin);
+        DispatchKeyValueVector(sentry, "angles", fAngle);
+
+		SetEntProp(sentry, Prop_Send, "m_iUpgradeLevel", 3);
+		SetEntProp(sentry, Prop_Send, "m_iHighestUpgradeLevel", 3);
+		SetEntProp(sentry, Prop_Data, "m_spawnflags", flags);
+		// SetEntProp(sentry, Prop_Send, "m_bBuilding", 1);
+		SetEntProp(sentry, Prop_Send, "m_bBuilding", 0);
+		SetEntProp(sentry, Prop_Send, "m_nSkin", GetClientTeam(builder) - 2);
+		DispatchSpawn(sentry);
+        
         // SetEntProp(sentry, Prop_Send, "m_bPlayerControlled", 1);
         SetEntProp(sentry, Prop_Send, "m_iTeamNum", builder > 0 ? GetClientTeam(builder) : view_as<int>(FF2_GetBossTeam()));
 

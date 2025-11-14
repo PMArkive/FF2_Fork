@@ -24,7 +24,7 @@ public Plugin myinfo=
 Handle g_SDKCallInitDroppedWeapon;
 Handle g_SDKCallPickupWeaponFromOther;
 
-Handle AliveCurrencyTimer;
+// Handle AliveCurrencyTimer;
 
 enum
 {
@@ -266,8 +266,10 @@ public /*void*/int Native_EqiupWeaponFromDropped(Handle plugin, int numParams)
 public void OnPluginStart()
 {
 	HookEvent("teamplay_round_start", OnRoundStart);
-	HookEvent("teamplay_round_win", OnRoundEnd);
+	// HookEvent("teamplay_round_win", OnRoundEnd);
 	HookEvent("player_death", OnPlayerDeath);
+
+	RegAdminCmd("ff2_addcurrency", Cmd_AddCurrency, ADMFLAG_CHEATS, "Show me the money");
 
 	LoadTranslations("ff2_mvm.phrases");
 
@@ -293,6 +295,37 @@ public void OnPluginStart()
 	{
 		SetFailState("Could not find potry gamedata");
 	}
+}
+
+public Action Cmd_AddCurrency(int client, int args)
+{
+	char pattern[MAX_TARGET_LENGTH];
+	GetCmdArg(1, pattern, sizeof(pattern));
+	char targetName[MAX_TARGET_LENGTH];
+	int targets[MAXPLAYERS];
+	bool targetNounIsMultiLanguage;
+
+	// This is only for test.
+	int matches;
+	if((matches = ProcessTargetString(pattern, client, targets, 1, 0, targetName, sizeof(targetName), targetNounIsMultiLanguage)) <= 0)
+	{
+		ReplyToTargetError(client, matches);
+		return Plugin_Handled;
+	}
+
+	int currency = GetCmdArgInt(2);
+	for(int loop = 0; loop <= matches; loop++)
+	{
+		if(targets[loop] == 0 || IsClientSourceTV(targets[loop]) || IsClientReplay(targets[loop]))
+			continue;
+
+		CPrintToChatAll("{olive}[FF2]{default} %N (%d)", targets[loop], currency);
+		MVM_AddPlayerCurrency(targets[loop], currency);
+	}
+
+    
+
+    return Plugin_Handled;
 }
 
 public void OnEntityDestroyed(int entity)
@@ -493,7 +526,8 @@ public void OnMapStart()
 		}
 	}
 
-	AliveCurrencyTimer = null;
+	// AliveCurrencyTimer = null;
+	CreateTimer(1.0, AliveCurrencyBonus, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 }
 
 int	TotalSpend, TotalAlive;
@@ -508,37 +542,36 @@ public Action OnRoundStart(Event event, const char[] name, bool dontBroadcast)
 
 	MaxSpent = 0, MaxSpentIndex = 0;
 
-	if(AliveCurrencyTimer == null)
-		AliveCurrencyTimer = CreateTimer(FindConVar("tf_arena_preround_time").FloatValue + 0.4,
-			OnArenaStart_InitAliveCurrencyBonus, _, TIMER_FLAG_NO_MAPCHANGE);
+	// if(AliveCurrencyTimer == null)
+	// 	AliveCurrencyTimer = CreateTimer(FindConVar("tf_arena_preround_time").FloatValue + 0.4,
+	// 		OnArenaStart_InitAliveCurrencyBonus, _, TIMER_FLAG_NO_MAPCHANGE);
 
 	return Plugin_Continue;
 }
 
-public Action OnRoundEnd(Event event, const char[] name, bool dontBroadcast)
-{
-	AliveCurrencyTimer = null;
-	return Plugin_Continue;
-}
+// public Action OnRoundEnd(Event event, const char[] name, bool dontBroadcast)
+// {
+// 	AliveCurrencyTimer = null;
+// 	return Plugin_Continue;
+// }
 
-public Action OnArenaStart_InitAliveCurrencyBonus(Handle timer)
-{
-	CreateTimer(1.0, AliveCurrencyBonus, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
-	return Plugin_Continue;
-}
+// public Action OnArenaStart_InitAliveCurrencyBonus(Handle timer)
+// {
+// 	CreateTimer(1.0, AliveCurrencyBonus, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+// 	return Plugin_Continue;
+// }
 
 public Action AliveCurrencyBonus(Handle timer)
 {
-	if(FF2_GetRoundState() != 1)
-		return Plugin_Stop;
-
+	// if(FF2_GetRoundState() != 1)
+	// 	return Plugin_Stop;
 	FOREACH_PLAYER(client)
 	{
-		if(!IsClientInGame(client) || !IsPlayerAlive(client)
-			|| TF2_GetClientTeam(client) == FF2_GetBossTeam())
+		if(!IsClientInGame(client))
+			// || !IsPlayerAlive(client) || TF2_GetClientTeam(client) == FF2_GetBossTeam())
 			continue;
 
-		MVM_SetPlayerCurrency(client, MVM_GetPlayerCurrency(client) + 1);
+		MVM_AddPlayerCurrency(client, 1);
 	}
 
 	return Plugin_Continue;
@@ -622,7 +655,7 @@ public Action OnPlayerDeath(Event event, const char[] name, bool dontBroadcast)
 		int earn = 100 / count;
 		for(int loop = 0; loop < count; loop++)
 		{
-			MVM_SetPlayerCurrency(indexes[loop], MVM_GetPlayerCurrency(indexes[loop]) + earn);
+			MVM_AddPlayerCurrency(indexes[loop], earn);
 		}
 	}	
 
@@ -712,7 +745,7 @@ public void FF2_OnWaveStarted(int wave)
 		}
 		else if(IsPlayerAlive(client))
 		{
-			MVM_SetPlayerCurrency(client, MVM_GetPlayerCurrency(client) + 200);
+			MVM_AddPlayerCurrency(client, 200);
 			EmitSoundToClient(client, "mvm/mvm_money_pickup.wav");
 		}
 	}

@@ -6463,12 +6463,19 @@ void KillStreakCheck(int attackerIndex, int client, int boss, float damage, bool
 		float currencyRatio = float(KILLSTREAK_DAMAGE_INTERVAL) / totalHealth,
 			currency = (2200.0 * min((totalHealth / 50000.0), 1.0)) * currencyRatio;
 
+#if defined _MVM_included
+		SetMannVsMachineMode(true);
+#endif
 		int count = interval - (lastNoticedInterval - 1);
 		for(int loop = 0; loop < count; loop++)
 		{
 			MVM_DropCurrency(client, TF_CURRENCY_PACK_CUSTOM, RoundToCeil(currency),
 				currencyDistributed, _, TF2_GetClientTeam(attackerIndex));
 		}
+
+#if defined _MVM_included
+		ResetMannVsMachineMode();
+#endif
 
 		// PrintToChatAll("%d, %d, %d", interval, lastNoticedInterval, count);
 		// PrintToChatAll("%.1f, %.1f, %d", currencyRatio, currency, RoundToCeil(currency));

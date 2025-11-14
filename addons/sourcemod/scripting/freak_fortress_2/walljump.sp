@@ -1,7 +1,7 @@
 #pragma semicolon 1
 
 #include <sourcemod>
-#include <dhooks>
+#include <sdktools>
 #include <tf2_stocks>
 #include <freak_fortress_2>
 #include <ff2_modules/general>
@@ -11,65 +11,54 @@ public Plugin myinfo=
 	name="Freak Fortress 2: Hit-Wall Jump",
 	author="Nopied◎",
 	description="",
-	version="20231002",
+	version="20250201",
 };
 
-public void OnPluginStart()
+public Action TF2_CalcIsAttackCritical(int client, int weapon, char[] weaponname, bool& result)
 {
-    GameData gamedata = new GameData("potry");
-    if (gamedata == null)
-    {
-        SetFailState("Could not find potry gamedata");
-        return;
-    }
+    int meleeWeapon = GetPlayerWeaponSlot(client, TFWeaponSlot_Melee), 
+        buttons = GetClientButtons(client);
 
-    CreateDynamicDetour(gamedata, "CTFWeaponBaseMelee::OnEntityHit", _, DHookCallback_OnEntityHit_Post);
+    if(meleeWeapon != weapon
+        || TF2_GetClientTeam(client) == FF2_GetBossTeam() || FF2_GetBossIndex(client) != -1
+        || !(buttons & IN_ATTACK) || (buttons & (IN_ATTACK2|IN_ATTACK3)) > 0)
+            return Plugin_Continue;
+
+    static float meleeRange = 80.0; // actual melee range = 66.0
+    float eyePos[3], eyeAngles[3], testPos[3];
+    GetClientEyePosition(client, eyePos);
+    GetClientEyeAngles(client, eyeAngles);
+
+    GetAngleVectors(eyeAngles, eyeAngles, NULL_VECTOR, NULL_VECTOR);
+    ScaleVector(eyeAngles, meleeRange);
+
+    AddVectors(eyePos, eyeAngles, testPos);
+
+    TR_TraceRayFilter(eyePos, testPos, MASK_ALL, RayType_EndPoint, Filter_OnlyWorld);
+    if(!TR_DidHit())    return Plugin_Continue;
+
+    float velocity[3];
+    GetEntPropVector(client, Prop_Data, "m_vecVelocity", velocity);
+    if(velocity[2] < -192.0)    return Plugin_Continue;
+    
+    // -48.0 ~ -192.0
+    float multiplier = 1.0;
+    if(velocity[2] < -48.0)
+        multiplier = 1.0 - ((velocity[2] * -1.0) * 0.0052083); // 1/192
+
+    velocity[2] = 700.0 * multiplier;
+    SetEntPropEnt(client, Prop_Send, "m_hGroundEntity", -1);
+    SetEntityFlags(client, GetEntityFlags(client) & ~FL_ONGROUND);
+
+    TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, velocity);
+    SetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", velocity);
+
+    return Plugin_Continue;
 }
 
-static void CreateDynamicDetour(GameData gamedata, const char[] name, DHookCallback callbackPre = INVALID_FUNCTION, DHookCallback callbackPost = INVALID_FUNCTION)
+public bool Filter_OnlyWorld(int entity, int contentsMask)
 {
-	DynamicDetour detour = DynamicDetour.FromConf(gamedata, name);
-	if (detour)
-	{
-		if (callbackPre != INVALID_FUNCTION)
-			detour.Enable(Hook_Pre, callbackPre);
-
-		if (callbackPost != INVALID_FUNCTION)
-			detour.Enable(Hook_Post, callbackPost);
-	}
-	else
-	{
-		LogError("Failed to create detour setup handle for %s", name);
-	}
-}
-
-public MRESReturn DHookCallback_OnEntityHit_Post(int weapon, DHookParam params)
-{
-    int iOwner = GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity");
-    int ent = params.Get(1);
-
-    if(TF2_GetClientTeam(iOwner) != FF2_GetBossTeam() && !IsBoss(iOwner)
-        && ent == 0)
-    {
-        // WallJump
-        float velocity[3];
-        GetEntPropVector(iOwner, Prop_Data, "m_vecVelocity", velocity);
-        if(velocity[2] < -192.0)    return MRES_Ignored;
-        
-        // -48.0 ~ -192.0
-        float multiplier = 1.0;
-        if(velocity[2] < -48.0)
-            multiplier = 1.0 - ((velocity[2] * -1.0) * 0.0052083); // 1/192
-
-        velocity[2] = 600.0 * multiplier;
-        SetEntPropEnt(iOwner, Prop_Send, "m_hGroundEntity", -1);
-        SetEntityFlags(iOwner, GetEntityFlags(iOwner) & ~FL_ONGROUND);
-
-        TeleportEntity(iOwner, NULL_VECTOR, NULL_VECTOR, velocity);
-        SetEntPropVector(iOwner, Prop_Data, "m_vecAbsVelocity", velocity);
-    }
-
-    return MRES_Ignored;
+    return entity == 0;
 }
 
 stock bool IsBoss(int client)
